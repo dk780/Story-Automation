@@ -7,7 +7,7 @@ LANG = {"hindi": "Hindi (Devanagari script, simple spoken Hindi)", "english": "E
 _client = None
 
 
-def ask(prompt, model, tries=6):
+def ask(prompt, model, tries=15):
     global _client
     _client = _client or genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     for attempt in range(tries):
@@ -18,8 +18,12 @@ def ask(prompt, model, tries=6):
             time.sleep(7)  # stay under the free-tier requests-per-minute limit
             return json.loads(r.text)
         except Exception as e:
-            print(f"  Gemini retry {attempt + 1}: {e}")
-            time.sleep(20 * (attempt + 1))
+            msg = str(e)
+            if "NOT_FOUND" in msg or "404" in msg or "API key" in msg:
+                raise  # wrong model name or bad key: retrying won't help
+            wait = min(30 * (attempt + 1), 180)  # 30s, 60s ... up to 3 min
+            print(f"  Gemini retry {attempt + 1}/{tries} (waiting {wait}s): {msg[:150]}")
+            time.sleep(wait)
     raise RuntimeError("Gemini failed repeatedly")
 
 
