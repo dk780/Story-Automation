@@ -1,0 +1,16 @@
+language: hindi            # hindi | english
+gemini_model: gemini-2.5-flash   # free-tier model; change here if Google renames/retires it
+target_minutes: 22         # final video length (20-30 works well)
+words_per_minute: 140      # narration pace used to size each scene
+scenes: 24                 # more scenes = more detail per video
+images_per_scene: 2        # ~30 sec per image at the defaults
+privacy: private           # keep "private" until you've reviewed a few videos, then "public"
+voice:
+  hindi: hi-IN-MadhurNeural      # alt: hi-IN-SwaraNeural
+  english: en-IN-PrabhatNeural   # alt: en-IN-NeerjaNeural
+  rate: "-5%"                    # slightly slower = more dramatic
+video: {width: 1280, height: 720, fps: 24}
+image_style: >
+  cinematic digital painting, rich warm colors, dramatic lighting, highly detailed,
+  epic storybook illustration, no text, no watermark
+thumbnail_font: /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf

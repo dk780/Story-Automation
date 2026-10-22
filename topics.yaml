@@ -1,0 +1,24 @@
+# One category per day in rotation. When a category's list runs out, Gemini invents a fresh story.
+ramayana:
+  - Hanuman leaps across the ocean to find Sita
+  - The building of Ram Setu, the bridge to Lanka
+  - Jatayu's brave stand against Ravana
+  - Shabri and the sweet berries
+  - Bharat and the sandals of Ram
+mahabharat:
+  - Karna, the generous warrior
+  - Abhimanyu and the Chakravyuha
+  - Ekalavya's devotion
+  - Krishna and his friend Sudama
+  - Bhishma's vow
+hanuman:
+  - Baby Hanuman and the Sun
+  - Hanuman brings the Sanjeevani mountain
+  - Hanuman burns Lanka
+superheroes:
+  - An original Indian superhero whose powers come from the monsoon
+  - An original superhero who protects a village's forest
+animal_fables:
+  - A Panchatantra tale about a clever crow
+  - A Jataka tale about the golden deer
+  - The lion, the hare and the well
