@@ -1,7 +1,7 @@
 name: daily-story-video
 on:
   schedule:
-#    - cron: "30 3 * * *"   # 03:30 UTC = 09:00 IST, every day
+    - cron: "30 3 * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -12,7 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core libraqm0
       - run: pip install -r requirements.txt
       - run: python main.py
