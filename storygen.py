@@ -7,7 +7,7 @@ LANG = {"hindi": "Hindi (Devanagari script, simple spoken Hindi)", "english": "E
 _client = None
 
 
-def ask(prompt, model, tries=15):
+def ask(prompt, model, tries=6):
     global _client
     _client = _client or genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     for attempt in range(tries):
@@ -15,14 +15,19 @@ def ask(prompt, model, tries=15):
             r = _client.models.generate_content(
                 model=model, contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.9))
-            time.sleep(7)  # stay under the free-tier requests-per-minute limit
+            time.sleep(13)  # your limit is 5 requests/minute
             return json.loads(r.text)
         except Exception as e:
             msg = str(e)
-            if "NOT_FOUND" in msg or "404" in msg or "API key" in msg:
-                raise  # wrong model name or bad key: retrying won't help
-            wait = min(30 * (attempt + 1), 180)  # 30s, 60s ... up to 3 min
-            print(f"  Gemini retry {attempt + 1}/{tries} (waiting {wait}s): {msg[:150]}")
+            if "NOT_FOUND" in msg or "API key" in msg:
+                raise
+            if "429" in msg:
+                if attempt >= 1:
+                    raise RuntimeError("Gemini quota used up. Try again after the daily reset.")
+                wait = 65  # lets the per-minute limit reset
+            else:
+                wait = min(30 * (attempt + 1), 120)
+            print(f"  Gemini retry {attempt + 1}/{tries} (waiting {wait}s): {msg[:300]}")
             time.sleep(wait)
     raise RuntimeError("Gemini failed repeatedly")
 
@@ -48,26 +53,30 @@ Stay faithful and respectful to the source tradition. For superhero stories inve
 def write_scenes(cfg, outline):
     scenes, n = outline["scenes"], len(outline["scenes"])
     words = int(cfg["target_minutes"] * cfg["words_per_minute"] / n)
-    k = cfg["images_per_scene"]
-    recap, out = [], []
-    for i, sc in enumerate(scenes):
-        nxt = scenes[i + 1]["beat"] if i + 1 < n else "(this is the final scene)"
-        prompt = f"""Write scene {i + 1} of {n} of a narrated story.
+    k, batch = cfg["images_per_scene"], cfg.get("scenes_per_call", 4)
+    recap, out = "", []
+    for start in range(0, n, batch):
+        chunk = scenes[start:start + batch]
+        beats = "\n".join(f"Scene {start + i + 1}: {s['beat']}" for i, s in enumerate(chunk))
+        first, last = start == 0, start + batch >= n
+        prompt = f"""Write scenes {start + 1} to {start + len(chunk)} of {n} of a narrated story.
 Narration language: {LANG[cfg['language']]}
 Title: {outline['title']}
 Characters (fixed looks): {json.dumps(outline['characters'], ensure_ascii=False)}
-Story so far: {' '.join(recap[-3:]) or '(nothing yet)'}
-This scene: {sc['beat']}
-Next scene: {nxt}
+Story so far: {recap or '(nothing yet)'}
+Scenes to write:
+{beats}
 
-Write about {words} words of pure spoken narration: vivid, emotional, short sentences that sound natural in text-to-speech.
-No headings, stage directions, emojis or markdown.
-{'Open with a powerful hook.' if i == 0 else ''}{' End with the moral and a warm invitation to subscribe.' if i == n - 1 else ''}
-Also write {k} image_prompts in English: concrete cinematic descriptions of what is on screen during the narration.
-Restate the look of every character present. Never include text or letters in the image.
-Return JSON: {{"narration": "...", "image_prompts": ["..."], "summary": "one-sentence recap"}}"""
+For EACH scene write about {words} words of pure spoken narration: vivid, emotional, short sentences that sound natural in text-to-speech. No headings, stage directions, emojis or markdown.
+{'Scene 1 must open with a powerful hook.' if first else ''}{' The final scene must end with the moral and a warm invitation to subscribe.' if last else ''}
+For each scene also write {k} image_prompts in English: concrete cinematic descriptions of what is on screen. Restate the look of every character present. Never include text or letters in the image.
+Return JSON: {{"scenes": [{{"narration": "...", "image_prompts": ["..."]}}], "summary": "2-3 sentence recap of these scenes"}}
+The scenes list must contain exactly {len(chunk)} items."""
         data = ask(prompt, cfg["gemini_model"])
-        recap.append(data["summary"])
-        out.append({"narration": data["narration"].strip(), "image_prompts": data["image_prompts"][:k]})
-        print(f"  scene {i + 1}/{n} written ({len(data['narration'].split())} words)")
+        if len(data["scenes"]) != len(chunk):
+            raise RuntimeError("Gemini returned the wrong number of scenes")
+        for s in data["scenes"]:
+            out.append({"narration": s["narration"].strip(), "image_prompts": s["image_prompts"][:k]})
+        recap = (recap + " " + data["summary"])[-1500:]
+        print(f"  scenes {start + 1}-{start + len(chunk)} of {n} written")
     return out
