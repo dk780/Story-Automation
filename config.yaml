@@ -1,5 +1,6 @@
 language: hindi            # hindi | english
 gemini_model: gemini-3.8-flash   # free-tier model; change here if Google renames/retires it
+fallback_model: gemini-3.6-flash
 target_minutes: 22         # final video length (20-30 works well)
 words_per_minute: 140      # narration pace used to size each scene
 scenes: 24                 # more scenes = more detail per video
