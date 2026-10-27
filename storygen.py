@@ -1,5 +1,6 @@
 """Story writing with the Gemini free tier: outline first, then scene by scene (keeps 20-30 min coherent)."""
 import json, os, time
+import yaml
 from google import genai
 from google.genai import types
 
@@ -7,13 +8,17 @@ LANG = {"hindi": "Hindi (Devanagari script, simple spoken Hindi)", "english": "E
 _client = None
 
 
-def ask(prompt, model, tries=6):
+def ask(prompt, model, tries=8):
     global _client
     _client = _client or genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    fb = yaml.safe_load(open("config.yaml", encoding="utf-8")).get("fallback_model")
+    models = [model] + ([fb] if fb and fb != model else [])
+    exhausted, waited_minute, i = set(), False, 0
     for attempt in range(tries):
+        m = models[i % len(models)]
         try:
             r = _client.models.generate_content(
-                model=model, contents=prompt,
+                model=m, contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.9))
             time.sleep(13)  # your limit is 5 requests/minute
             return json.loads(r.text)
@@ -21,14 +26,22 @@ def ask(prompt, model, tries=6):
             msg = str(e)
             if "NOT_FOUND" in msg or "API key" in msg:
                 raise
-            if "429" in msg:
-                if attempt >= 1:
-                    raise RuntimeError("Gemini quota used up. Try again after the daily reset.")
-                wait = 65  # lets the per-minute limit reset
-            else:
-                wait = min(30 * (attempt + 1), 120)
-            print(f"  Gemini retry {attempt + 1}/{tries} (waiting {wait}s): {msg[:300]}")
-            time.sleep(wait)
+            if "429" in msg:  # quota: try the other model, which has its own limit
+                exhausted.add(m)
+                if len(exhausted) >= len(models):
+                    if waited_minute:
+                        raise RuntimeError("Gemini quota used up on all models. Try after the daily reset.")
+                    waited_minute = True
+                    exhausted.clear()
+                    print("  quota hit on all models, waiting 65s in case it is the per-minute limit")
+                    time.sleep(65)
+                else:
+                    print(f"  {m} quota exhausted, switching model")
+                i += 1
+                continue
+            print(f"  {m} overloaded (attempt {attempt + 1}/{tries}): {msg[:200]}")
+            i += 1  # switch model on every overload
+            time.sleep(min(20 * (attempt + 1), 90))
     raise RuntimeError("Gemini failed repeatedly")
 
 
