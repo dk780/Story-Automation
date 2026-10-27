@@ -8,7 +8,7 @@ LANG = {"hindi": "Hindi (Devanagari script, simple spoken Hindi)", "english": "E
 _client = None
 
 
-def ask(prompt, model, tries=8):
+def ask(prompt, model, tries=16):
     global _client
     _client = _client or genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     fb = yaml.safe_load(open("config.yaml", encoding="utf-8")).get("fallback_model")
@@ -41,7 +41,7 @@ def ask(prompt, model, tries=8):
                 continue
             print(f"  {m} overloaded (attempt {attempt + 1}/{tries}): {msg[:200]}")
             i += 1  # switch model on every overload
-            time.sleep(min(20 * (attempt + 1), 90))
+            time.sleep(min(30 * (attempt + 1), 150))
     raise RuntimeError("Gemini failed repeatedly")
 
 
