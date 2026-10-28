@@ -1,13 +1,22 @@
-"""python main.py [--dry-run] [--category ramayana] [--topic "..."]"""
-import argparse, datetime, json, shutil, yaml
+"""python main.py [--dry-run] [--force] [--category ramayana] [--topic "..."]
+Resumable: progress lives in work/current, so a failed run continues where it stopped."""
+import argparse, datetime, json, shutil, uuid, yaml
 from pathlib import Path
 import storygen, tts, images, render
 
-STATE = Path("state.json")
+STATE, WORK = Path("state.json"), Path("work/current")
+DEFAULTS = {"scenes_per_call": 4, "fallback_model": None, "pollinations_model": "flux",
+            "hf_model": "black-forest-labs/FLUX.1-schnell",
+            "image_providers": ["pollinations", "huggingface"]}
 
 
-def pick(topics, category, topic):
-    used = set(json.loads(STATE.read_text())["used"]) if STATE.exists() else set()
+def load_state():
+    s = json.loads(STATE.read_text()) if STATE.exists() else {}
+    s.setdefault("used", []); s.setdefault("done_ids", [])
+    return s
+
+
+def pick(topics, category, topic, used):
     cats = list(topics)
     category = category or cats[datetime.date.today().toordinal() % len(cats)]
     if topic:
@@ -16,42 +25,70 @@ def pick(topics, category, topic):
     return category, (pool[0] if pool else None)  # None -> Gemini invents a fresh story
 
 
-def mark_used(key):
-    used = json.loads(STATE.read_text())["used"] if STATE.exists() else []
-    STATE.write_text(json.dumps({"used": used + [key]}, ensure_ascii=False, indent=2))
-
-
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true", help="make the video but don't upload")
+    ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--force", action="store_true")
     ap.add_argument("--category"); ap.add_argument("--topic")
     a = ap.parse_args()
-    cfg = yaml.safe_load(open("config.yaml", encoding="utf-8"))
+    cfg = {**DEFAULTS, **yaml.safe_load(open("config.yaml", encoding="utf-8"))}
     topics = yaml.safe_load(open("topics.yaml", encoding="utf-8"))
-    category, topic = pick(topics, a.category, a.topic)
-    print(f"Category: {category} | Topic: {topic or '(AI picks a fresh story)'}")
+    state, today = load_state(), datetime.date.today().isoformat()
 
-    work = Path("work") / datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    work.mkdir(parents=True)
-    print("1/5 Outline"); outline = storygen.make_outline(cfg, category, topic)
-    print("2/5 Writing scenes"); scenes = storygen.write_scenes(cfg, outline)
-    (work / "story.json").write_text(json.dumps({"outline": outline, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("3/5 Narration"); audio = tts.narrate(scenes, cfg, work)
-    print("4/5 Images"); imgs = images.make_images(scenes, cfg, work)
-    print("5/5 Rendering"); out = work / "video.mp4"
-    secs = render.render(audio, imgs, cfg, work, out)
+    if not (a.dry_run or a.force) and state.get("last_success") == today:
+        print("Today's video is already uploaded. Nothing to do."); return
+
+    meta_p = WORK / "meta.json"
+    if WORK.exists():  # decide whether to resume or start clean
+        stale = True
+        if meta_p.exists() and not (a.topic or a.category):
+            m = json.loads(meta_p.read_text())
+            age = (datetime.date.today() - datetime.date.fromisoformat(m["date"])).days
+            stale = m["id"] in state["done_ids"] or age > 2
+        if stale:
+            shutil.rmtree(WORK)
+    WORK.mkdir(parents=True, exist_ok=True)
+
+    if meta_p.exists():
+        meta = json.loads(meta_p.read_text())
+        print(f"RESUMING unfinished video: {meta['category']} | {meta['topic']}")
+    else:
+        category, topic = pick(topics, a.category, a.topic, state["used"])
+        meta = {"id": uuid.uuid4().hex, "date": today, "category": category, "topic": topic}
+        meta_p.write_text(json.dumps(meta, ensure_ascii=False))
+        print(f"NEW video: {category} | {topic or '(AI picks a fresh story)'}")
+
+    print("1/5 Outline")
+    out_p = WORK / "outline.json"
+    if out_p.exists():
+        outline = json.loads(out_p.read_text(encoding="utf-8"))
+    else:
+        outline = storygen.make_outline(cfg, meta["category"], meta["topic"])
+        out_p.write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print("2/5 Writing scenes")
+    sc_p = WORK / "scenes.json"
+    if sc_p.exists():
+        scenes = json.loads(sc_p.read_text(encoding="utf-8"))
+    else:
+        scenes = storygen.write_scenes(cfg, outline, WORK)
+        sc_p.write_text(json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print("3/5 Narration"); audio = tts.narrate(scenes, cfg, WORK)
+    print("4/5 Images"); imgs = images.make_images(scenes, cfg, WORK)
+    print("5/5 Rendering")
+    video, thumb = WORK / "video.mp4", WORK / "thumb.jpg"
+    secs = render.render(audio, imgs, cfg, WORK, video)
     print(f"Video length: {secs / 60:.1f} min")
-    thumb = work / "thumb.jpg"
     render.make_thumbnail(imgs[0][0], outline["title"], cfg, thumb)
 
     if a.dry_run:
-        print("Dry run: skipping upload. Video at", out)
-    else:
-        from upload_youtube import upload
-        print("Uploaded:", upload(out, thumb, outline["title"], outline["description"], outline["tags"], cfg["privacy"]))
-    mark_used(topic or outline["title"])
-    if not a.dry_run:
-        shutil.rmtree(work, ignore_errors=True)
+        print("Dry run: skipping upload. Video at", video); return
+    from upload_youtube import upload
+    print("Uploaded:", upload(video, thumb, outline["title"], outline["description"], outline["tags"], cfg["privacy"]))
+    state["used"].append(meta["topic"] or outline["title"])
+    state["done_ids"].append(meta["id"]); state["last_success"] = today
+    STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    shutil.rmtree(WORK, ignore_errors=True)
 
 
 if __name__ == "__main__":

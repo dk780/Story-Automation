@@ -1,27 +1,61 @@
 name: daily-story-video
 on:
   schedule:
-    - cron: "30 3 * * *"
+    - cron: "30 3 * * *"   # 09:00 IST
+    - cron: "30 9 * * *"   # 15:00 IST: automatic retry; does nothing if today's video is already uploaded
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Make a video even if one was already uploaded today"
+        type: boolean
+        default: false
 permissions:
   contents: write
+concurrency:
+  group: story-video
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+      - name: Restore saved progress
+        uses: actions/cache/restore@v4
+        with:
+          path: work/current
+          key: work-${{ github.run_id }}
+          restore-keys: work-
       - run: pip install -r requirements.txt
-      - run: python main.py
+      - name: Make and upload the video
+        run: python main.py ${{ github.event.inputs.force == 'true' && '--force' || '' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      - name: Save progress for the next run
+        if: always() && hashFiles('work/current/**') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: work/current
+          key: work-${{ github.run_id }}
+      - name: Keep the video if the upload failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video
+          path: work/current/video.mp4
+          retention-days: 3
+          if-no-files-found: ignore
       - name: Save used-topics state
+        if: success()
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
