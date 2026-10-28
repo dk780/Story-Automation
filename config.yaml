@@ -4,7 +4,7 @@ fallback_model: gemini-3.6-flash
 target_minutes: 22         # final video length (20-30 works well)
 words_per_minute: 140      # narration pace used to size each scene
 scenes: 24                 # more scenes = more detail per video
-images_per_scene: 2        # ~30 sec per image at the defaults
+images_per_scene: 1        # ~30 sec per image at the defaults
 scenes_per_call: 6
 privacy: private           # keep "private" until you've reviewed a few videos, then "public"
 voice:
