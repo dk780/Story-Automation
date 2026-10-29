@@ -1,26 +1,50 @@
-"""Free neural narration via Microsoft Edge TTS (no API key). Skips scenes that already exist (resume)."""
-import asyncio, os, edge_tts
+"""Free neural narration (Microsoft Edge TTS, no key). One short clip per shot so voice, picture and caption stay in sync."""
+import asyncio, os, re
+import edge_tts
 
 
-async def _one(text, voice, rate, path):
-    for attempt in range(6):
-        try:
-            await edge_tts.Communicate(text, voice, rate=rate).save(path)
-            if os.path.getsize(path) > 2000:
-                return
-        except Exception as e:
-            print(f"  TTS retry {attempt + 1}: {str(e)[:120]}")
-        await asyncio.sleep(5 * (attempt + 1))
-    raise RuntimeError("TTS failed repeatedly")
+def _clean(text):
+    text = re.sub(r"[*_#`~\[\]{}<>]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _ok(path):
+    return os.path.exists(path) and os.path.getsize(path) > 1500
+
+
+async def _one(text, voice, rate, pitch, path, sem):
+    async with sem:
+        for attempt in range(6):
+            try:
+                kw = {"rate": rate}
+                if pitch:
+                    kw["pitch"] = pitch
+                await edge_tts.Communicate(text, voice, **kw).save(path)
+                if _ok(path):
+                    return
+            except Exception as e:
+                print(f"  TTS retry {attempt + 1}: {str(e)[:100]}")
+            await asyncio.sleep(3 * (attempt + 1))
+        raise RuntimeError("TTS failed repeatedly for: " + text[:40])
+
+
+async def _all(jobs, voice, rate, pitch):
+    sem = asyncio.Semaphore(4)
+    await asyncio.gather(*[_one(t, voice, rate, pitch, p, sem) for t, p in jobs])
 
 
 def narrate(scenes, cfg, workdir):
-    voice, rate = cfg["voice"][cfg["language"]], cfg["voice"]["rate"]
-    paths = []
-    for i, sc in enumerate(scenes):
-        p = str(workdir / f"scene_{i:02d}.mp3")
-        if not (os.path.exists(p) and os.path.getsize(p) > 2000):
-            asyncio.run(_one(sc["narration"], voice, rate, p))
-        paths.append(p)
-    print(f"  narration ready ({len(paths)} scenes)")
+    voice, rate, pitch = cfg["voice"][cfg["language"]], cfg["voice"]["rate"], cfg["voice"].get("pitch")
+    jobs, paths = [], []
+    for si, sc in enumerate(scenes):
+        row = []
+        for ki, shot in enumerate(sc["shots"]):
+            p = str(workdir / f"a_{si:02d}_{ki:02d}.mp3")
+            row.append(p)
+            if not _ok(p):
+                jobs.append((_clean(shot["narration"]), p))
+        paths.append(row)
+    if jobs:
+        asyncio.run(_all(jobs, voice, rate, pitch))
+    print(f"  narration ready ({sum(len(r) for r in paths)} clips)")
     return paths

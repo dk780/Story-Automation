@@ -1,18 +1,39 @@
-language: hindi            # hindi | english
-gemini_model: gemini-3.8-flash   # free-tier model; change here if Google renames/retires it
+language: hindi                    # hindi | english
+gemini_model: gemini-3.8-flash
 fallback_model: gemini-3.6-flash
-target_minutes: 22         # final video length (20-30 works well)
-words_per_minute: 140      # narration pace used to size each scene
-scenes: 24                 # more scenes = more detail per video
-images_per_scene: 1        # ~30 sec per image at the defaults
-scenes_per_call: 6
-privacy: private           # keep "private" until you've reviewed a few videos, then "public"
+target_minutes: 10                 # video length. 8-12 is the sweet spot; raise to 15 for longer
+scenes: 12                         # story chapters
+shots_per_scene: 9                 # a new shot (camera move + caption) every ~5 seconds
+scenes_per_call: 4                 # Gemini requests per video = 1 + scenes/scenes_per_call
+words_per_minute: 165              # used only to size the script
+privacy: private                   # switch to public once you are happy with the videos
+
 voice:
-  hindi: hi-IN-MadhurNeural      # alt: hi-IN-SwaraNeural
-  english: en-IN-PrabhatNeural   # alt: en-IN-NeerjaNeural
-  rate: "-5%"                    # slightly slower = more dramatic
+  hindi: hi-IN-MadhurNeural        # deep male storyteller. Alternative: hi-IN-SwaraNeural (female)
+  english: en-IN-PrabhatNeural     # alternative: en-IN-NeerjaNeural
+  rate: "+15%"                     # speaking speed. +20% faster, +0% normal
+  pitch: "-2Hz"                    # slightly deeper = more dramatic
+
 video: {width: 1280, height: 720, fps: 24}
+crossfade: 0.5                     # seconds of dissolve between shots
+
+captions: true                     # burned-in captions (Hindi needs the bundled font + text-shaping support)
+caption_font: assets/fonts/FreeSansBold.ttf
+caption_size: 46
+thumbnail_font: assets/fonts/FreeSansBold.ttf
+
+music_volume: 0.30                 # background music loudness (it automatically ducks under the voice)
+music_by_category:                 # tracks live in assets/music/ (drop your own mp3 there too)
+  ramayana: devotional_calm
+  hanuman: adventure_light
+  mahabharat: epic_tense
+  superheroes: epic_tense
+  animal_fables: adventure_light
+
+image_providers: [pollinations, cloudflare, huggingface]   # tried in this order; unusable ones are skipped
+image_gen_size: [1536, 864]
+pollinations_model: flux
+hf_model: black-forest-labs/FLUX.1-schnell
 image_style: >
   cinematic digital painting, rich warm colors, dramatic lighting, highly detailed,
-  epic storybook illustration, no text, no watermark
-thumbnail_font: /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf
+  epic Indian mythological storybook illustration, 16:9 wide shot, no text, no watermark

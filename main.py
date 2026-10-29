@@ -5,9 +5,9 @@ from pathlib import Path
 import storygen, tts, images, render
 
 STATE, WORK = Path("state.json"), Path("work/current")
-DEFAULTS = {"scenes_per_call": 4, "fallback_model": None, "pollinations_model": "flux",
-            "hf_model": "black-forest-labs/FLUX.1-schnell",
-            "image_providers": ["pollinations", "huggingface"]}
+DEFAULTS = {"scenes_per_call": 4, "fallback_model": None, "pollinations_model": "flux", "shots_per_scene": 9,
+            "hf_model": "black-forest-labs/FLUX.1-schnell", "image_gen_size": [1536, 864],
+            "image_providers": ["pollinations", "cloudflare", "huggingface"], "music_by_category": {}}
 
 
 def load_state():
@@ -37,8 +37,15 @@ def main():
     if not (a.dry_run or a.force) and state.get("last_success") == today:
         print("Today's video is already uploaded. Nothing to do."); return
 
-    meta_p = WORK / "meta.json"
-    if WORK.exists():  # decide whether to resume or start clean
+    sc_p, meta_p = WORK / "scenes.json", WORK / "meta.json"
+    if sc_p.exists():  # progress from an older version of the pipeline cannot be reused
+        try:
+            old = json.loads(sc_p.read_text(encoding="utf-8"))
+            if not (old and "shots" in old[0]):
+                shutil.rmtree(WORK)
+        except Exception:
+            shutil.rmtree(WORK)
+    if WORK.exists():  # resume or start clean?
         stale = True
         if meta_p.exists() and not (a.topic or a.category):
             m = json.loads(meta_p.read_text())
@@ -65,19 +72,21 @@ def main():
         outline = storygen.make_outline(cfg, meta["category"], meta["topic"])
         out_p.write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("2/5 Writing scenes")
-    sc_p = WORK / "scenes.json"
+    print("2/5 Writing the script")
     if sc_p.exists():
         scenes = json.loads(sc_p.read_text(encoding="utf-8"))
     else:
         scenes = storygen.write_scenes(cfg, outline, WORK)
         sc_p.write_text(json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"  {sum(len(s['shots']) for s in scenes)} shots in {len(scenes)} scenes")
 
     print("3/5 Narration"); audio = tts.narrate(scenes, cfg, WORK)
-    print("4/5 Images"); imgs = images.make_images(scenes, cfg, WORK)
+    print("4/5 Pictures"); imgs = images.make_images(scenes, cfg, WORK)
     print("5/5 Rendering")
+    plan = [[{"audio": audio[i][k], "image": imgs[i][k], "text": sh["narration"]} for k, sh in enumerate(sc["shots"])]
+            for i, sc in enumerate(scenes)]
     video, thumb = WORK / "video.mp4", WORK / "thumb.jpg"
-    secs = render.render(audio, imgs, cfg, WORK, video)
+    secs = render.render(plan, cfg, WORK, video, cfg["music_by_category"].get(meta["category"]))
     print(f"Video length: {secs / 60:.1f} min")
     render.make_thumbnail(imgs[0][0], outline["title"], cfg, thumb)
 

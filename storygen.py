@@ -1,4 +1,5 @@
-"""Story writing with Gemini. Saves progress after every batch so a failed run can resume without re-spending quota."""
+"""Story writing with Gemini. The script is a list of SHOTS (one sentence + optionally a new picture each),
+so pictures and captions change with the narration. Progress is saved after every batch (resume-safe)."""
 import json, os, time
 from google import genai
 from google.genai import types
@@ -28,7 +29,7 @@ def ask(prompt, cfg, tries=16):
             msg = str(e)
             if "NOT_FOUND" in msg or "API key" in msg or "API_KEY" in msg:
                 raise
-            if "429" in msg:  # quota: the other model has its own limit
+            if "429" in msg:
                 exhausted.add(m)
                 if len(exhausted) >= len(models):
                     if waited_minute:
@@ -73,8 +74,9 @@ Stay faithful and respectful to the source tradition. For superhero stories inve
 def write_scenes(cfg, outline, workdir):
     part = workdir / "scenes_partial.json"
     scenes, n = outline["scenes"], len(outline["scenes"])
-    words = int(cfg["target_minutes"] * cfg["words_per_minute"] / n)
-    k, batch = cfg["images_per_scene"], cfg["scenes_per_call"]
+    S = cfg["shots_per_scene"]
+    wps = max(8, int(cfg["target_minutes"] * cfg["words_per_minute"] / (n * S)))
+    batch = cfg["scenes_per_call"]
     saved = json.loads(part.read_text(encoding="utf-8")) if part.exists() else {"out": [], "recap": ""}
     out, recap = saved["out"], saved["recap"]
     if out:
@@ -83,7 +85,7 @@ def write_scenes(cfg, outline, workdir):
         chunk = scenes[start:start + batch]
         beats = "\n".join(f"Scene {start + i + 1}: {s['beat']}" for i, s in enumerate(chunk))
         first, last = start == 0, start + batch >= n
-        prompt = f"""Write scenes {start + 1} to {start + len(chunk)} of {n} of a narrated story.
+        prompt = f"""Write scenes {start + 1} to {start + len(chunk)} of {n} of a narrated story video.
 Narration language: {LANG[cfg['language']]}
 Title: {outline['title']}
 Characters (fixed looks): {json.dumps(outline['characters'], ensure_ascii=False)}
@@ -91,25 +93,33 @@ Story so far: {recap or '(nothing yet)'}
 Scenes to write:
 {beats}
 
-For EACH scene write about {words} words of pure spoken narration: vivid, emotional, short sentences that sound natural in text-to-speech. No headings, stage directions, emojis or markdown.
-{'Scene 1 must open with a powerful hook.' if first else ''}{' The final scene must end with the moral and a warm invitation to subscribe.' if last else ''}
-For each scene also write {k} image_prompts in English: concrete cinematic descriptions of what is on screen. Restate the look of every character present. Never include text or letters in the image.
-Return JSON: {{"scenes": [{{"narration": "...", "image_prompts": ["..."]}}], "summary": "2-3 sentence recap of these scenes"}}
+Each scene is a list of exactly {S} SHOTS. A shot is ONE spoken sentence of about {wps} words, plus the picture shown while it is spoken.
+- Together the shots of a scene tell that scene's events in order as flowing narration, with no repetition.
+- Vivid, emotional, short sentences that sound natural in text-to-speech. No headings, emojis, markdown or stage directions.
+- image_prompt: an English, cinematic description of what the viewer SEES (subject, action, setting, light, camera angle). Give a NEW image_prompt only when the picture should change, roughly every second shot. Use null when the previous picture still fits; the video then shows the same picture with a new camera move.
+- The first shot of every scene MUST have an image_prompt. Restate the look of every character in frame. Never include text or letters in the picture.
+{'- The very first shot must be a powerful hook that makes people keep watching.' if first else ''}{'- The final scene must end with the moral and a warm invitation to subscribe.' if last else ''}
+Return JSON: {{"scenes": [{{"shots": [{{"narration": "...", "image_prompt": "..." or null}}]}}], "summary": "2-3 sentence recap of these scenes"}}
 The scenes list must contain exactly {len(chunk)} items."""
         for _ in range(3):
             data = ask(prompt, cfg)
-            ok = isinstance(data.get("scenes"), list) and len(data["scenes"]) == len(chunk) and \
-                all(isinstance(s.get("narration"), str) and len(s["narration"]) > 50 for s in data["scenes"])
+            sc = data.get("scenes")
+            ok = isinstance(sc, list) and len(sc) == len(chunk) and all(
+                isinstance(s.get("shots"), list) and len(s["shots"]) >= 4 and
+                all(isinstance(x.get("narration"), str) and len(x["narration"].strip()) > 8 for x in s["shots"]) for s in sc)
             if ok:
                 break
             print("  batch came back malformed, asking again")
         else:
             raise RuntimeError("Gemini returned malformed scenes 3 times")
-        for s, b in zip(data["scenes"], chunk):
-            prompts = [p for p in (s.get("image_prompts") or []) if isinstance(p, str) and p.strip()]
-            while len(prompts) < k:  # never leave a scene without a picture prompt
-                prompts.append(prompts[0] if prompts else f"{outline['title']}. {b['beat']}")
-            out.append({"narration": s["narration"].strip(), "image_prompts": prompts[:k]})
+        for s, b in zip(sc, chunk):
+            shots = []
+            for x in s["shots"]:
+                p = x.get("image_prompt")
+                shots.append({"narration": x["narration"].strip(), "image_prompt": p.strip() if isinstance(p, str) and p.strip() else None})
+            if not shots[0]["image_prompt"]:  # every scene starts on a fresh picture
+                shots[0]["image_prompt"] = f"{outline['title']}. {b['beat']}"
+            out.append({"shots": shots})
         recap = (recap + " " + str(data.get("summary", "")))[-1500:]
         part.write_text(json.dumps({"out": out, "recap": recap}, ensure_ascii=False), encoding="utf-8")
         print(f"  scenes {start + 1}-{start + len(chunk)} of {n} written")

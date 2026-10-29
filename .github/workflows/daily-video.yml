@@ -30,6 +30,8 @@ jobs:
           path: work/current
           key: work-${{ github.run_id }}
           restore-keys: work-
+      - name: Text-shaping library for Hindi captions (optional, never blocks)
+        run: timeout 90 sudo apt-get install -y --no-install-recommends libfribidi0 libraqm0 || true
       - run: pip install -r requirements.txt
       - name: Make and upload the video
         run: python main.py ${{ github.event.inputs.force == 'true' && '--force' || '' }}
@@ -40,6 +42,8 @@ jobs:
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       - name: Save progress for the next run
         if: always() && hashFiles('work/current/**') != ''
         uses: actions/cache/save@v4
