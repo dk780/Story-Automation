@@ -1,6 +1,7 @@
 """Free neural narration (Microsoft Edge TTS, no key). One short clip per shot so voice, picture and caption stay in sync."""
 import asyncio, os, re
 import edge_tts
+import cast
 
 
 def _clean(text):
@@ -28,13 +29,12 @@ async def _one(text, voice, rate, pitch, path, sem):
         raise RuntimeError("TTS failed repeatedly for: " + text[:40])
 
 
-async def _all(jobs, voice, rate, pitch):
+async def _all(jobs):
     sem = asyncio.Semaphore(4)
-    await asyncio.gather(*[_one(t, voice, rate, pitch, p, sem) for t, p in jobs])
+    await asyncio.gather(*[_one(t, v, r, pi, p, sem) for t, v, r, pi, p in jobs])
 
 
-def narrate(scenes, cfg, workdir):
-    voice, rate, pitch = cfg["voice"][cfg["language"]], cfg["voice"]["rate"], cfg["voice"].get("pitch")
+def narrate(scenes, outline, cfg, workdir):
     jobs, paths = [], []
     for si, sc in enumerate(scenes):
         row = []
@@ -42,9 +42,10 @@ def narrate(scenes, cfg, workdir):
             p = str(workdir / f"a_{si:02d}_{ki:02d}.mp3")
             row.append(p)
             if not _ok(p):
-                jobs.append((_clean(shot["narration"]), p))
+                pr = cast.profile(shot.get("speaker"), outline, cfg)
+                jobs.append((_clean(shot["narration"]), pr["voice"], pr["rate"], pr.get("pitch"), p))
         paths.append(row)
     if jobs:
-        asyncio.run(_all(jobs, voice, rate, pitch))
+        asyncio.run(_all(jobs))
     print(f"  narration ready ({sum(len(r) for r in paths)} clips)")
     return paths

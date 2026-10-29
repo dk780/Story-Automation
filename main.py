@@ -2,12 +2,12 @@
 Resumable: progress lives in work/current, so a failed run continues where it stopped."""
 import argparse, datetime, json, shutil, uuid, yaml
 from pathlib import Path
-import storygen, tts, images, render
+import storygen, tts, images, render, cast
 
 STATE, WORK = Path("state.json"), Path("work/current")
 DEFAULTS = {"scenes_per_call": 4, "fallback_model": None, "pollinations_model": "flux", "shots_per_scene": 9,
             "hf_model": "black-forest-labs/FLUX.1-schnell", "image_gen_size": [1536, 864],
-            "image_providers": ["pollinations", "cloudflare", "huggingface"], "music_by_category": {}}
+            "image_providers": ["pollinations", "cloudflare", "huggingface"], "music_by_category": {}, "animation": "parallax"}
 
 
 def load_state():
@@ -41,7 +41,7 @@ def main():
     if sc_p.exists():  # progress from an older version of the pipeline cannot be reused
         try:
             old = json.loads(sc_p.read_text(encoding="utf-8"))
-            if not (old and "shots" in old[0]):
+            if not (old and "shots" in old[0] and "speaker" in old[0]["shots"][0]):
                 shutil.rmtree(WORK)
         except Exception:
             shutil.rmtree(WORK)
@@ -80,11 +80,14 @@ def main():
         sc_p.write_text(json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  {sum(len(s['shots']) for s in scenes)} shots in {len(scenes)} scenes")
 
-    print("3/5 Narration"); audio = tts.narrate(scenes, cfg, WORK)
-    print("4/5 Pictures"); imgs = images.make_images(scenes, cfg, WORK)
+    if not outline.get("cast"):  # outline from an older version
+        shutil.rmtree(WORK); raise SystemExit("Old saved progress discarded. Run again to start a fresh video.")
+    print("3/5 Voices (narrator + characters)"); audio = tts.narrate(scenes, outline, cfg, WORK)
+    print("4/5 Pictures"); imgs = images.make_images(scenes, outline, cfg, WORK)
     print("5/5 Rendering")
-    plan = [[{"audio": audio[i][k], "image": imgs[i][k], "text": sh["narration"]} for k, sh in enumerate(sc["shots"])]
-            for i, sc in enumerate(scenes)]
+    plan = [[{"audio": audio[i][k], "image": imgs[i][k], "text": sh["narration"], "speaker": sh.get("speaker", "Narrator"),
+              "fx": cast.profile(sh.get("speaker"), outline, cfg).get("fx"), "color": cast.color(sh.get("speaker"), outline)}
+             for k, sh in enumerate(sc["shots"])] for i, sc in enumerate(scenes)]
     video, thumb = WORK / "video.mp4", WORK / "thumb.jpg"
     secs = render.render(plan, cfg, WORK, video, cfg["music_by_category"].get(meta["category"]))
     print(f"Video length: {secs / 60:.1f} min")

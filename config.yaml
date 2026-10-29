@@ -1,39 +1,63 @@
 language: hindi                    # hindi | english
 gemini_model: gemini-3.8-flash
 fallback_model: gemini-3.6-flash
-target_minutes: 10                 # video length. 8-12 is the sweet spot; raise to 15 for longer
-scenes: 12                         # story chapters
-shots_per_scene: 9                 # a new shot (camera move + caption) every ~5 seconds
-scenes_per_call: 4                 # Gemini requests per video = 1 + scenes/scenes_per_call
-words_per_minute: 165              # used only to size the script
-privacy: private                   # switch to public once you are happy with the videos
+target_minutes: 10
+scenes: 12
+shots_per_scene: 9                 # a new shot every ~5 seconds
+scenes_per_call: 4
+words_per_minute: 165
+privacy: private
 
-voice:
-  hindi: hi-IN-MadhurNeural        # deep male storyteller. Alternative: hi-IN-SwaraNeural (female)
-  english: en-IN-PrabhatNeural     # alternative: en-IN-NeerjaNeural
-  rate: "+15%"                     # speaking speed. +20% faster, +0% normal
-  pitch: "-2Hz"                    # slightly deeper = more dramatic
+# ---- character voices (the narrator and every character get their own sound) ----
+# Edge TTS has 2 base voices per language, so extra variety comes from pitch, speed and an optional echo effect.
+voices:
+  hindi:
+    narrator:   {voice: hi-IN-MadhurNeural, rate: "+12%", pitch: "-2Hz"}
+    young_hero: {voice: hi-IN-MadhurNeural, rate: "+18%", pitch: "+22Hz"}
+    elder_sage: {voice: hi-IN-MadhurNeural, rate: "+0%",  pitch: "-18Hz"}
+    villain:    {voice: hi-IN-MadhurNeural, rate: "-3%",  pitch: "-35Hz", fx: "aecho=0.8:0.6:45:0.35"}
+    god:        {voice: hi-IN-MadhurNeural, rate: "+4%",  pitch: "-12Hz", fx: "aecho=0.8:0.7:110:0.3"}
+    woman:      {voice: hi-IN-SwaraNeural,  rate: "+12%", pitch: "+0Hz"}
+    queen:      {voice: hi-IN-SwaraNeural,  rate: "+6%",  pitch: "-8Hz"}
+    child:      {voice: hi-IN-SwaraNeural,  rate: "+24%", pitch: "+35Hz"}
+    animal:     {voice: hi-IN-SwaraNeural,  rate: "+26%", pitch: "+22Hz", fx: "chorus=0.6:0.9:50:0.4:0.25:2"}
+  english:
+    narrator:   {voice: en-IN-PrabhatNeural, rate: "+12%", pitch: "-2Hz"}
+    young_hero: {voice: en-IN-PrabhatNeural, rate: "+18%", pitch: "+20Hz"}
+    elder_sage: {voice: en-IN-PrabhatNeural, rate: "+0%",  pitch: "-18Hz"}
+    villain:    {voice: en-IN-PrabhatNeural, rate: "-3%",  pitch: "-35Hz", fx: "aecho=0.8:0.6:45:0.35"}
+    god:        {voice: en-IN-PrabhatNeural, rate: "+4%",  pitch: "-12Hz", fx: "aecho=0.8:0.7:110:0.3"}
+    woman:      {voice: en-IN-NeerjaNeural,  rate: "+12%", pitch: "+0Hz"}
+    queen:      {voice: en-IN-NeerjaNeural,  rate: "+6%",  pitch: "-8Hz"}
+    child:      {voice: en-IN-NeerjaNeural,  rate: "+24%", pitch: "+35Hz"}
+    animal:     {voice: en-IN-NeerjaNeural,  rate: "+26%", pitch: "+22Hz", fx: "chorus=0.6:0.9:50:0.4:0.25:2"}
+
+# ---- 3D-style motion ----
+animation: parallax                # parallax = AI depth map + moving camera (3D feel) | simple = zoom/pan only
+depth_model: depth-anything/Depth-Anything-V2-Small-hf
+talk_motion: 1.0                   # how much the speaker's picture bobs while talking (0 = off, 1.5 = more)
+narrator_motion: 0.35              # same, for narrator-only shots
 
 video: {width: 1280, height: 720, fps: 24}
-crossfade: 0.5                     # seconds of dissolve between shots
+crossfade: 0.5
 
-captions: true                     # burned-in captions (Hindi needs the bundled font + text-shaping support)
+captions: true
 caption_font: assets/fonts/FreeSansBold.ttf
 caption_size: 46
 thumbnail_font: assets/fonts/FreeSansBold.ttf
 
-music_volume: 0.30                 # background music loudness (it automatically ducks under the voice)
-music_by_category:                 # tracks live in assets/music/ (drop your own mp3 there too)
+music_volume: 0.28
+music_by_category:
   ramayana: devotional_calm
   hanuman: adventure_light
   mahabharat: epic_tense
   superheroes: epic_tense
   animal_fables: adventure_light
 
-image_providers: [pollinations, cloudflare, huggingface]   # tried in this order; unusable ones are skipped
+image_providers: [pollinations, cloudflare, huggingface]
 image_gen_size: [1536, 864]
 pollinations_model: flux
 hf_model: black-forest-labs/FLUX.1-schnell
 image_style: >
-  cinematic digital painting, rich warm colors, dramatic lighting, highly detailed,
-  epic Indian mythological storybook illustration, 16:9 wide shot, no text, no watermark
+  cinematic 3D animated movie style, Pixar-like stylized characters with expressive faces, rich warm colors,
+  dramatic lighting, highly detailed, Indian mythological setting, 16:9, no text, no watermark

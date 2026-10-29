@@ -3,6 +3,7 @@ so pictures and captions change with the narration. Progress is saved after ever
 import json, os, time
 from google import genai
 from google.genai import types
+from cast import ARCHETYPES, resolve_speaker
 
 LANG = {"hindi": "Hindi (Devanagari script, simple spoken Hindi)", "english": "English (simple, warm, Indian-friendly)"}
 _client = None
@@ -49,6 +50,7 @@ def ask(prompt, cfg, tries=16):
 
 
 def make_outline(cfg, category, topic):
+    ARCH = " / ".join(ARCHETYPES)
     prompt = f"""You are a master storyteller planning a {cfg['target_minutes']}-minute narrated YouTube video.
 Category: {category}
 Story: {topic or 'choose a fresh, lesser-known story from this category'}
@@ -58,7 +60,8 @@ Return JSON with exactly these keys:
 - title: catchy, under 70 characters, in the narration language
 - description: 150-250 words, SEO friendly, ending with 5 relevant hashtags
 - tags: list of 12 short strings
-- characters: object mapping each main character name to ONE sentence describing their fixed look (English, for an image generator)
+- characters: object mapping each main character name to ONE sentence describing their fixed look (English, for a 3D-animation image generator). Use at most 6 characters and write each name the same way everywhere.
+- cast: object mapping the SAME character names to {{"voice": one of {ARCH}}} (pick the voice that fits: young_hero, elder_sage, villain, god, woman, queen, child, animal)
 - scenes: list of exactly {cfg['scenes']} objects, each {{"beat": "1-2 sentence summary of what happens"}} (English)
 
 Rules: scene 1 opens with a gripping hook; build tension to a climax around 80% of the story; end with a meaningful moral.
@@ -66,6 +69,10 @@ Stay faithful and respectful to the source tradition. For superhero stories inve
     for _ in range(3):
         data = ask(prompt, cfg)
         if isinstance(data.get("scenes"), list) and len(data["scenes"]) >= 4 and data.get("title"):
+            chars = data.get("characters") if isinstance(data.get("characters"), dict) else {}
+            cast = data.get("cast") if isinstance(data.get("cast"), dict) else {}
+            data["characters"] = chars
+            data["cast"] = {n: {"voice": (cast.get(n) or {}).get("voice") if (cast.get(n) or {}).get("voice") in ARCHETYPES else "young_hero"} for n in chars}
             return data
         print("  outline looked incomplete, asking again")
     raise RuntimeError("Could not get a valid outline")
@@ -93,13 +100,14 @@ Story so far: {recap or '(nothing yet)'}
 Scenes to write:
 {beats}
 
-Each scene is a list of exactly {S} SHOTS. A shot is ONE spoken sentence of about {wps} words, plus the picture shown while it is spoken.
-- Together the shots of a scene tell that scene's events in order as flowing narration, with no repetition.
+Each scene is a list of exactly {S} SHOTS. A shot is ONE spoken sentence of about {wps} words, said by ONE speaker, plus the picture shown while it is spoken.
+- speaker: "Narrator" or the exact name of a character from the Characters list. About half of the shots should be DIALOGUE: a character speaking in first person, in their own voice and personality (no quotation marks, no "he said"). The Narrator links the story between dialogues.
+- Together the shots of a scene tell that scene's events in order, with no repetition.
 - Vivid, emotional, short sentences that sound natural in text-to-speech. No headings, emojis, markdown or stage directions.
-- image_prompt: an English, cinematic description of what the viewer SEES (subject, action, setting, light, camera angle). Give a NEW image_prompt only when the picture should change, roughly every second shot. Use null when the previous picture still fits; the video then shows the same picture with a new camera move.
+- image_prompt: an English, cinematic description of what the viewer SEES (subject, action, setting, light, camera angle). For a dialogue shot show THAT character in a medium or close shot, face clearly visible, speaking with an expressive emotion. Give a NEW image_prompt only when the picture should change, roughly every second shot. Use null when the previous picture still fits; the video then shows the same picture with a new camera move.
 - The first shot of every scene MUST have an image_prompt. Restate the look of every character in frame. Never include text or letters in the picture.
 {'- The very first shot must be a powerful hook that makes people keep watching.' if first else ''}{'- The final scene must end with the moral and a warm invitation to subscribe.' if last else ''}
-Return JSON: {{"scenes": [{{"shots": [{{"narration": "...", "image_prompt": "..." or null}}]}}], "summary": "2-3 sentence recap of these scenes"}}
+Return JSON: {{"scenes": [{{"shots": [{{"speaker": "...", "narration": "...", "image_prompt": "..." or null}}]}}], "summary": "2-3 sentence recap of these scenes"}}
 The scenes list must contain exactly {len(chunk)} items."""
         for _ in range(3):
             data = ask(prompt, cfg)
@@ -116,7 +124,8 @@ The scenes list must contain exactly {len(chunk)} items."""
             shots = []
             for x in s["shots"]:
                 p = x.get("image_prompt")
-                shots.append({"narration": x["narration"].strip(), "image_prompt": p.strip() if isinstance(p, str) and p.strip() else None})
+                shots.append({"speaker": resolve_speaker(str(x.get("speaker", "")), outline), "narration": x["narration"].strip(),
+                              "image_prompt": p.strip() if isinstance(p, str) and p.strip() else None})
             if not shots[0]["image_prompt"]:  # every scene starts on a fresh picture
                 shots[0]["image_prompt"] = f"{outline['title']}. {b['beat']}"
             out.append({"shots": shots})

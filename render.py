@@ -3,6 +3,10 @@ narration + background music that ducks under the voice."""
 import glob, random, re, shutil, subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, features, ImageOps
+try:
+    import numpy as np, cv2
+except Exception:  # simple zoom/pan mode still works without them
+    np = cv2 = None
 
 
 def _find_ffmpeg():
@@ -67,11 +71,12 @@ def captions_available(cfg):
     return True
 
 
-def caption_png(text, cfg, path):
+def caption_png(text, cfg, path, speaker=None, color=None):
     w, h = cfg["video"]["width"], cfg["video"]["height"]
     size = cfg.get("caption_size", 46)
-    font = ImageFont.truetype(cfg["caption_font"], size, layout_engine=ImageFont.Layout.RAQM) \
-        if features.check("raqm") else ImageFont.truetype(cfg["caption_font"], size)
+    mk = lambda sz: ImageFont.truetype(cfg["caption_font"], sz, layout_engine=ImageFont.Layout.RAQM) \
+        if features.check("raqm") else ImageFont.truetype(cfg["caption_font"], sz)
+    font, small = mk(size), mk(int(size * 0.72))
     lines, cur = [], ""
     for word in text.split():
         trial = (cur + " " + word).strip()
@@ -86,11 +91,95 @@ def caption_png(text, cfg, path):
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     x0, y0 = (w - box_w) // 2, h - box_h - 46
-    d.rounded_rectangle([x0, y0, x0 + box_w, y0 + box_h], radius=16, fill=(0, 0, 0, 150))
+    d.rounded_rectangle([x0, y0, x0 + box_w, y0 + box_h], radius=16, fill=(0, 0, 0, 160),
+                        outline=(color or (255, 255, 255)) + (230,) if speaker else None, width=3 if speaker else 0)
     for i, line in enumerate(lines):
         tw = font.getlength(line)
         d.text(((w - tw) / 2, y0 + 10 + i * lh), line, font=font, fill="white", stroke_width=2, stroke_fill="black")
+    if speaker:  # name tag of whoever is talking
+        tw = small.getlength(speaker)
+        cw, ch = int(tw) + 40, int(size * 0.72 * 1.5) + 6
+        d.rounded_rectangle([x0 + 18, y0 - ch + 4, x0 + 18 + cw, y0 + 4], radius=12, fill=(color or (255, 170, 60)) + (255,))
+        d.text((x0 + 38, y0 - ch + 6), speaker, font=small, fill=(20, 20, 20))
     img.save(path)
+
+
+# ---------- 3D-style camera (depth parallax) ----------
+CAMS = ["orbit_right", "orbit_left", "push_in", "pull_back", "rise", "drop"]
+
+
+def _cam(kind, e):
+    """-> (cam_x, cam_y, zoom, parallax_x) for eased progress e in 0..1"""
+    sway = 0.7 * np.sin(np.pi * e)
+    return {
+        "orbit_right": (-1 + 2 * e, 0.0, 1.14, -1 + 2 * e),
+        "orbit_left": (1 - 2 * e, 0.0, 1.14, 1 - 2 * e),
+        "push_in": (0.25 * (e - .5), 0.0, 1.08 + 0.18 * e, sway),
+        "pull_back": (0.25 * (e - .5), 0.0, 1.26 - 0.18 * e, -sway),
+        "rise": (0.0, -1 + 2 * e, 1.14, 0.4 * sway),
+        "drop": (0.0, 1 - 2 * e, 1.14, -0.4 * sway),
+    }[kind]
+
+
+def envelope(audio_path, fps, frames):
+    """loudness of the voice per video frame (0..1), used to make the speaker bob while talking"""
+    raw = subprocess.run([FFMPEG, "-v", "error", "-i", str(audio_path), "-ac", "1", "-ar", "8000", "-f", "f32le", "-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, dtype=np.float32)
+    hop = max(int(8000 / fps), 1)
+    n = len(x) // hop
+    rms = np.sqrt((x[:n * hop].reshape(n, hop) ** 2).mean(1)) if n else np.zeros(1)
+    rms = rms / (np.percentile(rms, 95) + 1e-6)
+    rms = np.clip(rms, 0, 1)
+    rms = np.convolve(rms, np.ones(3) / 3, mode="same")          # smooth, so it moves like breath/speech not jitter
+    out = np.zeros(frames, dtype=np.float32)
+    out[:min(frames, len(rms))] = rms[:frames]
+    return out
+
+
+def parallax_clip(img_path, depth, kind, frames, cfg, cap_png, env, talk, out):
+    W, H, fps = cfg["video"]["width"], cfg["video"]["height"], cfg["video"]["fps"]
+    img = cv2.imread(str(img_path))
+    ih, iw = img.shape[:2]
+    depth = cv2.resize(depth, (iw, ih)).astype(np.float32)
+    xs = (np.arange(W, dtype=np.float32) + 0.5) / W
+    ys = (np.arange(H, dtype=np.float32) + 0.5) / H
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    vig = np.repeat(((1 - 0.35 * (((xx / W - .5) ** 2 + (yy / H - .5) ** 2) * 2.2)) * 255).astype(np.uint8)[..., None], 3, axis=2)
+    cmd = [FFMPEG, "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-"]
+    if cap_png:
+        cmd += ["-i", str(cap_png), "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto,format=yuv420p[o]", "-map", "[o]"]
+    else:
+        cmd += ["-pix_fmt", "yuv420p"]
+    cmd += ["-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p", str(out)]
+    errlog = open(str(out) + ".log", "wb")
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=errlog)
+    PX, PY, S = 0.034 * iw, 0.028 * ih, 0.013 * ih
+    try:
+        for f in range(frames):
+            p = f / max(frames - 1, 1)
+            e = p * p * (3 - 2 * p)
+            cx, cy, z, px = _cam(kind, e)
+            a = float(env[f]) if f < len(env) else 0.0
+            z = z * (1 + 0.007 * a * talk)
+            ww, hh = iw / z, ih / z
+            mx, my = (iw - ww) / 2 * 0.55, (ih - hh) / 2 * 0.55
+            ccx, ccy = iw / 2 + cx * mx, ih / 2 + cy * my
+            bx = np.broadcast_to((ccx - ww / 2 + xs * ww)[None, :], (H, W)).astype(np.float32)
+            by = np.broadcast_to((ccy - hh / 2 + ys * hh)[:, None], (H, W)).astype(np.float32)
+            dv = cv2.remap(depth, bx, by, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101) - 0.5
+            breath = np.sin(2 * np.pi * f / (fps * 3.4)) * 0.0015 * ih
+            mapx = (bx + px * PX * dv).astype(np.float32)
+            mapy = (by + (cy * PY * dv) + (a * talk * S + breath) * (dv + 0.5) ** 2).astype(np.float32)   # near pixels bob while the voice is loud
+            frame = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
+            frame = cv2.multiply(frame, vig, scale=1 / 255.0)
+            proc.stdin.write(frame.tobytes())
+        proc.stdin.close()
+        proc.wait()
+    finally:
+        errlog.close()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=Path(str(out) + ".log").read_bytes())
 
 
 # ---------- main render ----------
@@ -101,6 +190,11 @@ def render(plan, cfg, workdir, out_path, mood=None):
     xf_frames = int(round(xf * fps))
     xf = xf_frames / fps
     use_caps = captions_available(cfg)
+    use_3d = cfg.get("animation", "parallax") == "parallax" and cv2 is not None
+    if cfg.get("animation", "parallax") == "parallax" and cv2 is None:
+        print("  OpenCV not installed: using simple zoom/pan instead of the 3D camera")
+    if use_3d:
+        import depth as depthmod
     rnd = random.Random(7)
     wavs, scene_files, prev_move, shot_no = [], [], None, 0
 
@@ -112,22 +206,37 @@ def render(plan, cfg, workdir, out_path, mood=None):
             frames = int(-(-(raw + pad) * fps // 1))               # whole frames, so picture and voice never drift
             d = frames / fps
             wav = workdir / f"w_{si:02d}_{ki:02d}.wav"
-            run(["ffmpeg", "-y", "-i", shot["audio"], "-af", f"apad=whole_dur={d:.6f}", "-t", f"{d:.6f}",
+            fx = (shot.get("fx") + ",") if shot.get("fx") else ""
+            run(["ffmpeg", "-y", "-i", shot["audio"], "-af", f"{fx}apad=whole_dur={d:.6f}", "-t", f"{d:.6f}",
                  "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le", str(wav)])
             wavs.append(wav)
-            kind = rnd.choice([m for m in MOVES if m != prev_move]); prev_move = kind
             total = frames + xf_frames                              # extra tail overlaps into the next shot
             clip = workdir / f"c_{si:02d}_{ki:02d}.mp4"
-            chain = f"{move_filter(kind, total, w, h, fps)},format=yuv420p"
-            cmd = ["ffmpeg", "-y", "-i", shot["image"]]
+            png = None
             if use_caps:
                 png = workdir / f"cap_{si:02d}_{ki:02d}.png"
-                caption_png(shot["text"], cfg, png)
-                cmd += ["-i", str(png), "-filter_complex", f"[0:v]{chain}[v];[v][1:v]overlay=0:0:format=auto,format=yuv420p[o]", "-map", "[o]"]
-            else:
-                cmd += ["-vf", chain]
-            cmd += ["-frames:v", str(total), "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p", str(clip)]
-            run(cmd)
+                who = shot.get("speaker") if shot.get("speaker") and shot["speaker"] != "Narrator" else None
+                caption_png(shot["text"], cfg, png, who, shot.get("color"))
+            done = False
+            if use_3d:
+                try:
+                    kind = rnd.choice([m for m in CAMS if m != prev_move]); prev_move = kind
+                    dmap = depthmod.depth_for(shot["image"], cfg)
+                    talk = cfg.get("talk_motion", 1.0) if (shot.get("speaker") and shot["speaker"] != "Narrator") else cfg.get("narrator_motion", 0.35)
+                    parallax_clip(shot["image"], dmap, kind, total, cfg, png, envelope(shot["audio"], fps, total), talk, clip)
+                    done = True
+                except Exception as e:
+                    print("  3D camera failed for a shot, using simple zoom:", str(e)[:200])
+            if not done:
+                kind = rnd.choice([m for m in MOVES if m != prev_move]); prev_move = kind
+                chain = f"{move_filter(kind, total, w, h, fps)},format=yuv420p"
+                cmd = ["ffmpeg", "-y", "-i", shot["image"]]
+                if png:
+                    cmd += ["-i", str(png), "-filter_complex", f"[0:v]{chain}[v];[v][1:v]overlay=0:0:format=auto,format=yuv420p[o]", "-map", "[o]"]
+                else:
+                    cmd += ["-vf", chain]
+                cmd += ["-frames:v", str(total), "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p", str(clip)]
+                run(cmd)
             clips.append(clip); durs.append(d); shot_no += 1
 
         scene_out = workdir / f"scene_{si:02d}.mp4"

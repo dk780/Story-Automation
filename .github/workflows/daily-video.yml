@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,7 +32,14 @@ jobs:
           restore-keys: work-
       - name: Text-shaping library for Hindi captions (optional, never blocks)
         run: timeout 90 sudo apt-get install -y --no-install-recommends libfribidi0 libraqm0 || true
+      - name: CPU PyTorch (runs the 3D depth model)
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - run: pip install -r requirements.txt
+      - name: Cache the depth model download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-depth-v1
       - name: Make and upload the video
         run: python main.py ${{ github.event.inputs.force == 'true' && '--force' || '' }}
         env:

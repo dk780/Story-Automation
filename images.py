@@ -65,7 +65,7 @@ def placeholder(prompt, w, h, path):
     Image.blend(img, glow.filter(ImageFilter.GaussianBlur(70)), 0.45).save(path, quality=90)
 
 
-def make_images(scenes, cfg, workdir):
+def make_images(scenes, outline, cfg, workdir):
     gw, gh = cfg["image_gen_size"]
     order = [p for p in cfg["image_providers"] if p in PROVIDERS]
     dead, fails = set(), {p: 0 for p in order}
@@ -80,7 +80,11 @@ def make_images(scenes, cfg, workdir):
             path = workdir / f"img_{si:02d}_{ki:02d}.jpg"
             if path.exists() and path.stat().st_size > 5000:  # resume
                 last = str(path); row.append(last); continue
-            full = f"{(prompt or 'epic scene').strip()} {cfg['image_style']}".strip()
+            look = (outline.get("characters") or {}).get(shot.get("speaker"))  # keep each character looking the same
+            base = (prompt or "epic scene").strip()
+            if look and look[:25].lower() not in base.lower():
+                base = f"{look}. {base}"
+            full = f"{base} {cfg['image_style']}".strip()
             done = False
             for name in order:
                 if name in dead:
