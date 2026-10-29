@@ -1,17 +1,40 @@
 """Assemble the video with ffmpeg: slow zoom (Ken Burns) on every image, narration, optional quiet music."""
-import glob, random, subprocess
+import glob, random, re, shutil, subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, features
 
 
+def _find_ffmpeg():
+    """Use the system ffmpeg if there is one, else the static build bundled with the imageio-ffmpeg pip package."""
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+FFMPEG = _find_ffmpeg()
+
+
 def run(cmd):
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if cmd[0] == "ffmpeg":
+        cmd = [FFMPEG] + cmd[1:]
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        print("ffmpeg failed:", e.stderr.decode(errors="replace")[-1500:])
+        raise
 
 
 def duration(path):
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                         capture_output=True, text=True, check=True).stdout
-    return float(out.strip())
+    probe = shutil.which("ffprobe")
+    if probe:
+        out = subprocess.run([probe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                             capture_output=True, text=True, check=True).stdout
+        return float(out.strip())
+    err = subprocess.run([FFMPEG, "-i", str(path)], capture_output=True, text=True).stderr  # no ffprobe: read it from ffmpeg
+    h, m, sec = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", err).groups()
+    return int(h) * 3600 + int(m) * 60 + float(sec)
 
 
 def render(audio_files, image_groups, cfg, workdir, out_path):
