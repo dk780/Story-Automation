@@ -80,10 +80,14 @@ def make_images(scenes, outline, cfg, workdir):
             path = workdir / f"img_{si:02d}_{ki:02d}.jpg"
             if path.exists() and path.stat().st_size > 5000:  # resume
                 last = str(path); row.append(last); continue
-            look = (outline.get("characters") or {}).get(shot.get("speaker"))  # keep each character looking the same
+            chars = outline.get("characters") or {}
             base = (prompt or "epic scene").strip()
-            if look and look[:25].lower() not in base.lower():
-                base = f"{look}. {base}"
+            present = [n for n in chars if n.lower() in base.lower()]
+            if shot.get("speaker") in chars and shot["speaker"] not in present:
+                present.insert(0, shot["speaker"])
+            looks = [chars[n] for n in present[:2] if chars[n][:30].lower() not in base.lower()]   # keep each character looking the same
+            if looks:
+                base = " ".join(f"{l}." for l in looks) + " " + base
             full = f"{base} {cfg['image_style']}".strip()
             done = False
             for name in order:

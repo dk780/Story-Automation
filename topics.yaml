@@ -1,24 +1,39 @@
-# One category per day in rotation. When a category's list runs out, Gemini invents a fresh story.
-ramayana:
-  - Hanuman leaps across the ocean to find Sita
-  - The building of Ram Setu, the bridge to Lanka
-  - Jatayu's brave stand against Ravana
-  - Shabri and the sweet berries
-  - Bharat and the sandals of Ram
-mahabharat:
-  - Karna, the generous warrior
-  - Abhimanyu and the Chakravyuha
-  - Ekalavya's devotion
-  - Krishna and his friend Sudama
-  - Bhishma's vow
+# Loved stories from the Puranas and epics. One god/category per day in rotation (order below).
+# When a list runs out, Gemini picks another well-known story of that deity.
+krishna:
+  - Little Krishna steals butter, and Yashoda sees the whole universe inside his mouth
+  - Krishna lifts Govardhan hill on his little finger to protect Gokul from Indra's storm
+  - Krishna dances on the serpent Kaliya and cleans the river Yamuna
+  - Krishna and Sudama, the friend who brought a handful of flattened rice
+  - Krishna and Radha, the flute that made the whole forest stop
+shiva:
+  - Shiva drinks the deadly halahala poison and becomes Neelkanth
+  - Bhagiratha's penance and Shiva catching the river Ganga in his hair
+  - Young Markandeya who defeated Yama through devotion to Shiva
+  - Kannappa, the hunter who offered his own eyes to Shiva
+  - Parvati's penance to win Shiva
+ganesha:
+  - How Ganesha got his elephant head
+  - Ganesha and Kartikeya's race around the world, and the wisdom of circling his parents
+  - Ganesha breaks his own tusk to write the Mahabharata
+  - Ganesha teaches the proud Kubera a lesson with a handful of rice
 hanuman:
-  - Baby Hanuman and the Sun
-  - Hanuman brings the Sanjeevani mountain
-  - Hanuman burns Lanka
-superheroes:
-  - An original Indian superhero whose powers come from the monsoon
-  - An original superhero who protects a village's forest
-animal_fables:
-  - A Panchatantra tale about a clever crow
-  - A Jataka tale about the golden deer
-  - The lion, the hare and the well
+  - Baby Hanuman mistakes the Sun for a mango
+  - Hanuman brings the Sanjeevani mountain to save Lakshmana
+  - Hanuman shows Ram and Sita in his heart
+  - Hanuman meets the old monkey who could not be moved, and learns humility
+vishnu:
+  - Narasimha and the devotion of little Prahlad
+  - Vamana takes three steps and humbles king Bali
+  - Samudra Manthan, the churning of the ocean
+  - Gajendra Moksha, the elephant saved by Vishnu
+  - Matsya avatar saves Manu from the great flood
+devi:
+  - Durga defeats the mighty demon Mahishasura
+  - Savitri follows Yama and wins back her husband Satyavan
+  - Goddess Annapurna and Shiva's empty begging bowl
+ram:
+  - Shabari and the sweet berries she tasted first for Ram
+  - The little squirrel who helped build Ram Setu
+  - Bharat carries Ram's sandals and rules in his name
+  - Kevat the boatman washes Ram's feet before crossing the Ganga

@@ -17,6 +17,9 @@ def resolve_speaker(speaker, outline):
     for n in names:
         if n == s or n.lower() == s.lower():
             return n
+    for n, shown in (outline.get("display_names") or {}).items():   # speaker written in Devanagari
+        if shown.strip() == s:
+            return n
     for n in names:  # partial match ("Baby Hanuman" vs "Hanuman")
         if n.lower() in s.lower() or s.lower() in n.lower():
             return n

@@ -71,7 +71,7 @@ def captions_available(cfg):
     return True
 
 
-def caption_png(text, cfg, path, speaker=None, color=None):
+def caption_png(text, cfg, path, speaker=None, color=None, title=None):
     w, h = cfg["video"]["width"], cfg["video"]["height"]
     size = cfg.get("caption_size", 46)
     mk = lambda sz: ImageFont.truetype(cfg["caption_font"], sz, layout_engine=ImageFont.Layout.RAQM) \
@@ -96,6 +96,20 @@ def caption_png(text, cfg, path, speaker=None, color=None):
     for i, line in enumerate(lines):
         tw = font.getlength(line)
         d.text(((w - tw) / 2, y0 + 10 + i * lh), line, font=font, fill="white", stroke_width=2, stroke_fill="black")
+    if title:  # title banner on the opening shot
+        big = mk(60)
+        tl, cur = [], ""
+        for word in title.split():
+            trial = (cur + " " + word).strip()
+            if big.getlength(trial) > w * 0.82 and cur:
+                tl.append(cur); cur = word
+            else:
+                cur = trial
+        tl.append(cur)
+        bh = 84 * len(tl) + 24
+        d.rounded_rectangle([60, 36, w - 60, 36 + bh], radius=22, fill=(0, 0, 0, 150), outline=(255, 205, 90, 255), width=3)
+        for i, line in enumerate(tl[:3]):
+            d.text(((w - big.getlength(line)) / 2, 48 + i * 84), line, font=big, fill=(255, 224, 140), stroke_width=3, stroke_fill=(60, 30, 0))
     if speaker:  # name tag of whoever is talking
         tw = small.getlength(speaker)
         cw, ch = int(tw) + 40, int(size * 0.72 * 1.5) + 6
@@ -137,6 +151,11 @@ def envelope(audio_path, fps, frames):
     return out
 
 
+def make_particles(rnd, W, H, count=60):
+    return [dict(x=rnd.uniform(0, W), y=rnd.uniform(0, H), vx=rnd.uniform(-8, 8), vy=-rnd.uniform(10, 38),
+                 r=rnd.choice([1, 1, 2, 2, 3]), ph=rnd.uniform(0, 6.28), sp=rnd.uniform(1.0, 2.6)) for _ in range(count)]
+
+
 def parallax_clip(img_path, depth, kind, frames, cfg, cap_png, env, talk, out):
     W, H, fps = cfg["video"]["width"], cfg["video"]["height"], cfg["video"]["fps"]
     img = cv2.imread(str(img_path))
@@ -155,6 +174,7 @@ def parallax_clip(img_path, depth, kind, frames, cfg, cap_png, env, talk, out):
     errlog = open(str(out) + ".log", "wb")
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=errlog)
     PX, PY, S = 0.034 * iw, 0.028 * ih, 0.013 * ih
+    parts = make_particles(random.Random(hash(str(img_path)) & 0xFFFF), W, H) if cfg.get("particles", True) else []
     try:
         for f in range(frames):
             p = f / max(frames - 1, 1)
@@ -173,6 +193,15 @@ def parallax_clip(img_path, depth, kind, frames, cfg, cap_png, env, talk, out):
             mapy = (by + (cy * PY * dv) + (a * talk * S + breath) * (dv + 0.5) ** 2).astype(np.float32)   # near pixels bob while the voice is loud
             frame = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
             frame = cv2.multiply(frame, vig, scale=1 / 255.0)
+            if parts:  # floating golden light dust, drawn on its own layer and added as a glow
+                layer = np.zeros((H, W, 3), np.uint8)
+                t = f / fps
+                for q in parts:
+                    px_, py_ = (q["x"] + q["vx"] * t) % W, (q["y"] + q["vy"] * t) % H
+                    tw = 0.55 + 0.45 * np.sin(q["ph"] + t * q["sp"] * 2)
+                    cv2.circle(layer, (int(px_), int(py_)), q["r"], (int(120 * tw), int(200 * tw), int(255 * tw)), -1, cv2.LINE_AA)
+                glow = cv2.GaussianBlur(layer, (0, 0), 3)
+                frame = cv2.add(frame, cv2.add(layer, glow))
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
         proc.wait()
@@ -215,8 +244,8 @@ def render(plan, cfg, workdir, out_path, mood=None):
             png = None
             if use_caps:
                 png = workdir / f"cap_{si:02d}_{ki:02d}.png"
-                who = shot.get("speaker") if shot.get("speaker") and shot["speaker"] != "Narrator" else None
-                caption_png(shot["text"], cfg, png, who, shot.get("color"))
+                who = (shot.get("label") or shot.get("speaker")) if shot.get("speaker") and shot["speaker"] != "Narrator" else None
+                caption_png(shot["text"], cfg, png, who, shot.get("color"), shot.get("title"))
             done = False
             if use_3d:
                 try:

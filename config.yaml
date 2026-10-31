@@ -1,8 +1,8 @@
 language: hindi                    # hindi | english
 gemini_model: gemini-3.8-flash
 fallback_model: gemini-3.6-flash
-target_minutes: 10
-scenes: 12
+target_minutes: 7
+scenes: 10
 shots_per_scene: 9                 # a new shot every ~5 seconds
 scenes_per_call: 4
 words_per_minute: 165
@@ -48,16 +48,21 @@ thumbnail_font: assets/fonts/FreeSansBold.ttf
 
 music_volume: 0.28
 music_by_category:
-  ramayana: devotional_calm
+  krishna: adventure_light
+  shiva: devotional_calm
+  ganesha: adventure_light
   hanuman: adventure_light
-  mahabharat: epic_tense
-  superheroes: epic_tense
-  animal_fables: adventure_light
+  vishnu: epic_tense
+  devi: epic_tense
+  ram: devotional_calm
+
+particles: true                    # floating golden light dust for a divine, magical feel
 
 image_providers: [pollinations, cloudflare, huggingface]
 image_gen_size: [1536, 864]
 pollinations_model: flux
 hf_model: black-forest-labs/FLUX.1-schnell
 image_style: >
-  cinematic 3D animated movie style, Pixar-like stylized characters with expressive faces, rich warm colors,
-  dramatic lighting, highly detailed, Indian mythological setting, 16:9, no text, no watermark
+  high-quality 3D animated Indian mythology film, Pixar-like stylized characters with expressive faces,
+  divine golden glow, rich saturated colors, dramatic cinematic lighting, beautiful temple architecture and nature,
+  16:9, no text, no watermark
