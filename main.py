@@ -7,7 +7,7 @@ import storygen, tts, images, render, cast
 STATE, WORK = Path("state.json"), Path("work/current")
 DEFAULTS = {"scenes_per_call": 4, "fallback_model": None, "pollinations_model": "flux", "shots_per_scene": 9,
             "hf_model": "black-forest-labs/FLUX.1-schnell", "image_gen_size": [1536, 864],
-            "image_providers": ["pollinations", "cloudflare", "huggingface"], "music_by_category": {}, "animation": "parallax"}
+            "image_providers": ["pollinations", "cloudflare", "huggingface"], "music_by_category": {}, "animation": "parallax", "particles": True}
 
 
 def load_state():
@@ -41,8 +41,9 @@ def main():
     if sc_p.exists():  # progress from an older version of the pipeline cannot be reused
         try:
             old = json.loads(sc_p.read_text(encoding="utf-8"))
-            if not (old and "shots" in old[0] and "speaker" in old[0]["shots"][0]):
-                shutil.rmtree(WORK)
+            ol = json.loads((WORK / "outline.json").read_text(encoding="utf-8"))
+            if not (old and "shots" in old[0] and "speaker" in old[0]["shots"][0] and "display_names" in ol):
+                shutil.rmtree(WORK)   # unfinished video from an older version of the pipeline
         except Exception:
             shutil.rmtree(WORK)
     if WORK.exists():  # resume or start clean?
@@ -68,6 +69,8 @@ def main():
     out_p = WORK / "outline.json"
     if out_p.exists():
         outline = json.loads(out_p.read_text(encoding="utf-8"))
+        if storygen.ensure_roman(outline, cfg):   # older saved outline with a Hindi-script title
+            out_p.write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
     else:
         outline = storygen.make_outline(cfg, meta["category"], meta["topic"])
         out_p.write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -86,8 +89,10 @@ def main():
     print("4/5 Pictures"); imgs = images.make_images(scenes, outline, cfg, WORK)
     print("5/5 Rendering")
     plan = [[{"audio": audio[i][k], "image": imgs[i][k], "text": sh["narration"], "speaker": sh.get("speaker", "Narrator"),
+              "label": (outline.get("display_names") or {}).get(sh.get("speaker"), sh.get("speaker")),
               "fx": cast.profile(sh.get("speaker"), outline, cfg).get("fx"), "color": cast.color(sh.get("speaker"), outline)}
              for k, sh in enumerate(sc["shots"])] for i, sc in enumerate(scenes)]
+    plan[0][0]["title"] = outline.get("title_display") or outline["title"]   # on-screen banner stays in Hindi script
     video, thumb = WORK / "video.mp4", WORK / "thumb.jpg"
     secs = render.render(plan, cfg, WORK, video, cfg["music_by_category"].get(meta["category"]))
     print(f"Video length: {secs / 60:.1f} min")
