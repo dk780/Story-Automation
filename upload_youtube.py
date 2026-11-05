@@ -7,13 +7,13 @@ from googleapiclient.http import MediaFileUpload
 SCOPE = ["https://www.googleapis.com/auth/youtube.upload"]
 
 
-def upload(video, thumb, title, description, tags, privacy):
+def upload(video, thumb, title, description, tags, privacy, category="24"):
     creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"],
                         token_uri="https://oauth2.googleapis.com/token",
                         client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"], scopes=SCOPE)
     yt = build("youtube", "v3", credentials=creds)
     body = {
-        "snippet": {"title": title[:100], "description": description[:4900], "tags": tags[:15], "categoryId": "24"},
+        "snippet": {"title": title[:100], "description": description[:4900], "tags": tags[:15], "categoryId": category},
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True},
     }
     req = yt.videos().insert(part="snippet,status", body=body,

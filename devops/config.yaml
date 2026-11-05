@@ -1,0 +1,19 @@
+series_name: DevOps Series
+channel_name: DevOps Series        # small text in the corner of every scene
+language: english                  # narration language: english | hindi (on-screen text is always English)
+gemini_model: gemini-3.8-flash
+fallback_model: gemini-3.6-flash
+privacy: private                   # switch to public after you have reviewed a few episodes
+review: true                       # a second Gemini pass checks the script for technical mistakes (1 extra request)
+
+target_minutes: 5
+scenes: 13                         # content scenes; an intro and an outro are added automatically
+words_per_minute: 150
+
+voice:
+  english: {voice: en-IN-PrabhatNeural, rate: "+8%", pitch: "+0Hz"}      # alternatives: en-IN-NeerjaNeural, en-US-AndrewNeural
+  hindi:   {voice: hi-IN-MadhurNeural,  rate: "+8%", pitch: "-2Hz"}
+
+video: {width: 1280, height: 720, fps: 24}
+music_volume: 0.16                 # quiet; it ducks under the voice
+music: adventure_light             # file name (without .mp3) in assets/music/

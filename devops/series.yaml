@@ -1,0 +1,42 @@
+# The DevOps series, in order. One episode is made per run; finished episodes are skipped.
+# `points` guide what the episode covers (Gemini builds the script from them).
+- {n: 1,  emoji: "♾️", level: beginner, title: "What is DevOps?", points: "why DevOps exists, silos between Dev and Ops, culture + practices + tools, benefits, common myths"}
+- {n: 2,  emoji: "🔄", level: beginner, title: "Waterfall vs Agile vs DevOps", points: "SDLC phases, waterfall limits, agile sprints, how DevOps extends agile to operations"}
+- {n: 3,  emoji: "♾️", level: beginner, title: "The DevOps Lifecycle", points: "plan, code, build, test, release, deploy, operate, monitor; continuous feedback; tools at each stage"}
+- {n: 4,  emoji: "🐧", level: beginner, title: "Linux Basics for DevOps", points: "why Linux, file system, permissions, processes, package managers, essential commands, shell scripting intro"}
+- {n: 5,  emoji: "🔀", level: beginner, title: "Version Control and Git", points: "what version control is, repository, commit, branch, merge, remote, basic commands"}
+- {n: 6,  emoji: "🌿", level: beginner, title: "Git Branching Strategies", points: "feature branches, pull requests, GitFlow, trunk-based development, when to use which"}
+- {n: 7,  emoji: "🔁", level: beginner, title: "What is CI/CD?", points: "continuous integration, continuous delivery vs deployment, pipeline stages, benefits"}
+- {n: 8,  emoji: "🛠️", level: beginner, title: "Jenkins Explained", points: "what Jenkins is, controller and agents, jobs, Jenkinsfile pipelines, plugins"}
+- {n: 9,  emoji: "🐙", level: beginner, title: "GitHub Actions Explained", points: "workflows, events, jobs, steps, runners, actions marketplace, secrets"}
+- {n: 10, emoji: "☁️", level: beginner, title: "Azure DevOps Explained", points: "Boards, Repos, Pipelines, Test Plans, Artifacts, YAML pipelines, service connections"}
+- {n: 11, emoji: "📦", level: beginner, title: "Build Tools and Artifact Repositories", points: "Maven, Gradle, npm, what an artifact is, Nexus, Artifactory, versioning"}
+- {n: 12, emoji: "🧪", level: beginner, title: "Test Automation in CI/CD", points: "unit, integration, end-to-end tests, test pyramid, Selenium, shift-left testing, quality gates"}
+- {n: 13, emoji: "🐳", level: beginner, title: "Containers and Docker", points: "problem containers solve, containers vs virtual machines, images, containers, Docker Hub, basic commands"}
+- {n: 14, emoji: "📄", level: intermediate, title: "Dockerfile and Docker Images", points: "Dockerfile instructions, layers, build cache, small images, multi-stage builds, registries"}
+- {n: 15, emoji: "🧩", level: intermediate, title: "Docker Compose", points: "multi-container apps, compose file, services, networks, volumes, local development"}
+- {n: 16, emoji: "☸️", level: intermediate, title: "Kubernetes Basics", points: "why orchestration, cluster, control plane, nodes, pods, how Kubernetes keeps apps running"}
+- {n: 17, emoji: "☸️", level: intermediate, title: "Kubernetes Deployments, Services and Ingress", points: "Deployment and replicas, rolling update, Service types, Ingress, ConfigMap and Secret"}
+- {n: 18, emoji: "⛵", level: intermediate, title: "Helm Explained", points: "package manager for Kubernetes, charts, values, releases, upgrades and rollbacks"}
+- {n: 19, emoji: "🏗️", level: beginner, title: "Infrastructure as Code", points: "manual vs code-defined infrastructure, declarative vs imperative, benefits, popular tools"}
+- {n: 20, emoji: "🏗️", level: intermediate, title: "Terraform Basics", points: "providers, resources, init plan apply destroy, HCL, variables, outputs"}
+- {n: 21, emoji: "🗂️", level: intermediate, title: "Terraform State and Modules", points: "state file, remote state and locking, modules, workspaces, best practices"}
+- {n: 22, emoji: "⚙️", level: intermediate, title: "Configuration Management and Ansible", points: "what config management solves, Ansible agentless, inventory, playbooks, modules, idempotency"}
+- {n: 23, emoji: "📡", level: beginner, title: "Monitoring vs Observability", points: "metrics, logs, traces, alerts, golden signals, difference between monitoring and observability"}
+- {n: 24, emoji: "📊", level: intermediate, title: "Prometheus and Grafana", points: "pull-based metrics, exporters, PromQL basics, alerting, Grafana dashboards"}
+- {n: 25, emoji: "📈", level: intermediate, title: "Azure Monitor and Application Insights", points: "metrics and logs, Log Analytics, KQL basics, alerts, Application Insights, dashboards"}
+- {n: 26, emoji: "📜", level: intermediate, title: "Logging and the ELK Stack", points: "centralized logging, Elasticsearch, Logstash, Kibana, log shippers, structured logs"}
+- {n: 27, emoji: "🚦", level: intermediate, title: "Deployment Strategies", points: "recreate, rolling, blue-green, canary, feature flags, rollback, trade-offs"}
+- {n: 28, emoji: "🛡️", level: intermediate, title: "DevSecOps Basics", points: "shift-left security, SAST, DAST, dependency and container scanning, secrets in code, security in the pipeline"}
+- {n: 29, emoji: "🔑", level: intermediate, title: "Secrets Management", points: "why not in code, environment variables, Azure Key Vault, HashiCorp Vault, rotation, least privilege"}
+- {n: 30, emoji: "🔄", level: intermediate, title: "GitOps Explained", points: "Git as single source of truth, pull-based delivery, Argo CD, Flux, drift detection"}
+- {n: 31, emoji: "🎯", level: intermediate, title: "SRE Basics: SLI, SLO and SLA", points: "reliability, SLIs, SLOs, SLAs, error budgets, toil, how SRE relates to DevOps"}
+- {n: 32, emoji: "☁️", level: beginner, title: "Cloud Computing for DevOps", points: "IaaS, PaaS, SaaS, regions and availability zones, shared responsibility, pay as you go"}
+- {n: 33, emoji: "☁️", level: beginner, title: "Azure Fundamentals for DevOps", points: "subscriptions, resource groups, VMs, App Service, AKS, storage, networking, Azure CLI"}
+- {n: 34, emoji: "🌐", level: beginner, title: "Networking Basics for DevOps", points: "IP addresses, DNS, ports, HTTP, load balancers, firewalls, reverse proxy"}
+- {n: 35, emoji: "📏", level: intermediate, title: "DORA Metrics", points: "deployment frequency, lead time, change failure rate, time to restore, how to improve"}
+- {n: 36, emoji: "🧱", level: intermediate, title: "Microservices and DevOps", points: "monolith vs microservices, independent deployment, service communication, challenges, why DevOps is needed"}
+- {n: 37, emoji: "🧯", level: intermediate, title: "Incident Management and Postmortems", points: "on-call, severity levels, incident response steps, blameless postmortem, runbooks"}
+- {n: 38, emoji: "🧰", level: intermediate, title: "Platform Engineering", points: "internal developer platform, golden paths, self-service, relation to DevOps and SRE"}
+- {n: 39, emoji: "🗺️", level: beginner, title: "DevOps Roadmap: How to Become a DevOps Engineer", points: "skills in order, tools, cloud, certifications, projects, career path"}
+- {n: 40, emoji: "🎤", level: beginner, title: "DevOps Interview Questions for Beginners", points: "common fundamentals questions on DevOps, CI/CD, Git, Docker, Kubernetes with short model answers"}

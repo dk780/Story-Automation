@@ -1,0 +1,66 @@
+name: devops-series-video
+on:
+  schedule:
+    - cron: "30 4 * * *"    # 10:00 IST, one episode per day
+    - cron: "30 10 * * *"   # 16:00 IST: automatic retry, does nothing if today's episode is already uploaded
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Make an episode even if one was already uploaded today"
+        type: boolean
+        default: false
+      episode:
+        description: "Episode number to make (leave empty for the next unfinished one)"
+        type: string
+        default: ""
+permissions:
+  contents: write
+concurrency:
+  group: devops-video
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: devops/requirements.txt
+      - name: Restore saved progress
+        uses: actions/cache/restore@v4
+        with:
+          path: work/devops
+          key: devops-${{ github.run_id }}
+          restore-keys: devops-
+      - run: pip install -r devops/requirements.txt
+      - name: Make and upload the next episode
+        run: python devops/run.py ${{ github.event.inputs.force == 'true' && '--force' || '' }} ${{ github.event.inputs.episode && format('--episode {0}', github.event.inputs.episode) || '' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      - name: Save progress for the next run
+        if: always() && hashFiles('work/devops/**') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: work/devops
+          key: devops-${{ github.run_id }}
+      - name: Keep the video if the upload failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devops-video
+          path: work/devops/*/video.mp4
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Save the list of finished episodes
+        if: success()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          if [ -f devops/state.json ]; then git add devops/state.json; fi
+          git diff --cached --quiet || (git commit -m "devops series: update state" && git push)
