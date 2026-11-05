@@ -17,6 +17,13 @@ def E(x, y, e, size, at, dur=0.5):
     return {"t": "emoji", "x": x, "y": y, "e": e or "🔹", "size": size, "at": at, "dur": dur}
 
 
+def ICO(x, y, it, size, at, dur=0.5):
+    """the item's real logo when it has one, otherwise its emoji"""
+    if it.get("logo"):
+        return {"t": "logo", "x": x, "y": y, "name": it["logo"], "size": size, "at": at, "dur": dur}
+    return E(x, y, it.get("emoji"), size, at, dur)
+
+
 def C(x, y, w, h, fill, at, dur=0.4, outline=INK, r=22, shape="rect", ow=4, alpha=255, noshadow=False):
     return {"t": "card", "x": x, "y": y, "w": w, "h": h, "fill": fill, "outline": outline, "r": r, "shape": shape,
             "ow": ow, "alpha": alpha, "at": at, "dur": dur, "noshadow": noshadow}
@@ -50,7 +57,7 @@ def lay_definition(sc, D):
     n = sc["narration"]
     t1 = cue_time(n, sc.get("term"), D, 0, 3)
     return heading(sc) + [
-        E(330, 400, sc["emoji"], 270, 0.4, 0.6),
+        ICO(330, 400, sc, 270, 0.4, 0.6),
         T(840, 300, sc["term"], 92, PAL[2], t1, 0.8, maxw=600),
         R(600, 1090, 372, t1 + 0.5, PAL[1]),
         T(840, 480, sc["text"], 42, INK, cue_time(n, sc.get("text_cue"), D, 1, 3, 0.35, 0.8), 1.0, maxw=580),
@@ -71,7 +78,7 @@ def lay_icons(sc, D):
         y = (330 + row * 215) if two else 370
         size = 120 if two else 160
         t = cue_time(n, it.get("cue"), D, i, k)
-        out += [E(x, y, it["emoji"], size, t), T(x, y + size / 2 + 38, it["label"], 36, INK, t + 0.25, 0.5, maxw=gap - 16)]
+        out += [ICO(x, y, it, size, t), T(x, y + size / 2 + 38, it["label"], 36, INK, t + 0.25, 0.5, maxw=gap - 16)]
     return out
 
 
@@ -91,7 +98,7 @@ def lay_flow(sc, D):
         y = (285 + row * 245) if two else 385
         pos.append((x, y))
         t = cue_time(n, it.get("cue"), D, i, k)
-        out += [C(x, y, cw, chh, FILL[i % 6], t), E(x, y - 30, it["emoji"], 92 if not two else 80, t + 0.12),
+        out += [C(x, y, cw, chh, FILL[i % 6], t), ICO(x, y - 30, it, 92 if not two else 80, t + 0.12),
                 T(x, y + 62, it["label"], 32, INK, t + 0.3, 0.5, maxw=cw - 14)]
         if i > 0:
             (px, py), same_row = pos[i - 1], (pos[i - 1][1] == y)
@@ -133,7 +140,7 @@ def lay_cycle(sc, D):
         x, y = cx + rx * math.cos(a), cy + ry * math.sin(a)
         pts.append((x, y))
         t = cue_time(n, it.get("cue"), D, i, k)
-        out += [C(x, y, 120, 120, FILL[i % 6], t, shape="circle"), E(x, y, it["emoji"], 70, t + 0.1),
+        out += [C(x, y, 120, 120, FILL[i % 6], t, shape="circle"), ICO(x, y, it, 70, t + 0.1),
                 T(x, y + 86, it["label"], 30, INK, t + 0.3, 0.5, maxw=200)]
     for i in range(k):
         (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % k]
@@ -154,7 +161,7 @@ def lay_list(sc, D):
     for i, it in enumerate(items):
         y = 205 + i * step + step / 2 - 20
         t = cue_time(n, it.get("cue"), D, i, k)
-        out += [E(300, y, it["emoji"], 78, t), T(390, y - (16 if it.get("detail") else 0), it["label"], 46, INK, t + 0.2, 0.6, anchor="lm", maxw=760, align="left")]
+        out += [ICO(300, y, it, 78, t), T(390, y - (16 if it.get("detail") else 0), it["label"], 46, INK, t + 0.2, 0.6, anchor="lm", maxw=760, align="left")]
         if it.get("detail"):
             out.append(T(390, y + 32, it["detail"], 30, GREY, t + 0.5, 0.6, anchor="lm", maxw=760, align="left"))
     return out
@@ -169,7 +176,7 @@ def lay_stack(sc, D):
     for i, it in enumerate(items):               # items are listed bottom -> top
         y = top + (k - 1 - i) * (bh + 12) + bh / 2
         t = cue_time(n, it.get("cue"), D, i, k)
-        out += [C(W / 2, y, 900, bh, FILL[i % 6], t), E(W / 2 - 380, y, it["emoji"], 64, t + 0.1),
+        out += [C(W / 2, y, 900, bh, FILL[i % 6], t), ICO(W / 2 - 380, y, it, 64, t + 0.1),
                 T(W / 2 + 40, y, it["label"], 40, INK, t + 0.25, 0.6, maxw=720)]
     return out
 

@@ -17,9 +17,9 @@ def _s(x, n=200):
 def _items(raw, lo, hi):
     out = []
     for it in (raw if isinstance(raw, list) else []):
-        if isinstance(it, dict) and it.get("label"):
-            out.append({"label": _s(it["label"], 40), "emoji": _s(it.get("emoji"), 12) or "🔹", "cue": _s(it.get("cue"), 40),
-                        "detail": _s(it.get("detail"), 70)})
+        if isinstance(it, dict) and (it.get("label") or it.get("logo")):
+            out.append({"label": _s(it.get("label") or it.get("logo"), 40), "emoji": _s(it.get("emoji"), 12) or "🔹", "cue": _s(it.get("cue"), 40),
+                        "detail": _s(it.get("detail"), 70), "logo": _s(it.get("logo"), 30)})
     return out[:hi] if len(out) >= lo else None
 
 
@@ -27,12 +27,12 @@ def normalize_scene(sc):
     """Return a clean scene dict, or None when it cannot be used."""
     if not isinstance(sc, dict) or len(_s(sc.get("narration"), 2000)) < 40:
         return None
-    lay = sc.get("layout") if sc.get("layout") in LAYOUTS else "list"
+    lay = "icons" if sc.get("layout") == "tools" else (sc.get("layout") if sc.get("layout") in LAYOUTS else "list")
     out = {"layout": lay, "heading": _s(sc.get("heading"), 60) or "Key idea", "narration": _s(sc["narration"], 1500)}
     if lay == "definition":
         if not sc.get("term") or not sc.get("text"):
             return None
-        out.update(term=_s(sc["term"], 30), text=_s(sc["text"], 110), emoji=_s(sc.get("emoji"), 12) or "💡", text_cue=_s(sc.get("text_cue"), 40))
+        out.update(term=_s(sc["term"], 30), text=_s(sc["text"], 110), emoji=_s(sc.get("emoji"), 12) or "💡", text_cue=_s(sc.get("text_cue"), 40), logo=_s(sc.get("logo"), 30))
     elif lay in ("icons", "flow", "cycle", "list", "stack"):
         lo, hi = {"icons": (2, 6), "flow": (3, 6), "cycle": (4, 8), "list": (3, 5), "stack": (3, 5)}[lay]
         items = _items(sc.get("items"), lo, hi)
@@ -99,6 +99,7 @@ Every scene has: "heading" (max 6 words, shown on screen), "narration" (about {w
 - "quiz": "question", "options": 4 short strings, "answer": index 0-3 (exactly one clearly correct answer)
 "cue" is a word or short phrase copied EXACTLY from that scene's narration, at the moment the item should appear on screen.
 Use ONLY emojis from this list: {EMOJI_HINT}.
+LOGOS: any item of "icons", "flow", "cycle", "list" or "stack" (and the "definition" layout) may have an optional "logo": the exact product or company name, for example Git, GitHub, Docker, Kubernetes, Jenkins, Terraform, Ansible, Azure, AWS, Prometheus, Grafana, Maven, Selenium, Netflix. Its real logo is then shown instead of the emoji. Add "logo" whenever an item IS a specific tool, product or company (for a tools scene use "icons" or "list" with a "logo" on every item). Never add it for generic ideas such as "build" or "test".
 
 Structure: scene 1 = a relatable problem or hook; scene 2 = the clear definition ("definition" layout); then build understanding step by step with at least 5 different layouts including one "flow" or "cycle"; the second to last scene = a quick recap ("icons" or "list"); the LAST scene = a "quiz" whose narration reads the question and options, tells the viewer to pause, and then reveals the answer with a one-line reason."""
     for _ in range(3):

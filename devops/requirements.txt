@@ -7,3 +7,4 @@ imageio-ffmpeg>=0.5.1
 google-api-python-client>=2.100
 google-auth>=2.23
 google-auth-oauthlib>=1.1
+pymupdf>=1.24

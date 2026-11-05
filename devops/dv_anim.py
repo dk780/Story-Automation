@@ -3,6 +3,7 @@ with pop / wipe / draw-in animations. Everything is drawn with Pillow, so no bro
 import math
 from PIL import Image, ImageDraw
 import dv_fonts as F
+import dv_logos
 
 W, H = 1280, 720
 INK = (31, 36, 48)
@@ -181,7 +182,8 @@ class SceneRenderer:
             img.paste(spr, (x, y), spr)
             return
         if key not in self.sp:
-            self.sp[key] = {"text": text_sprite, "card": shape_sprite, "rule": rule_sprite}.get(t, lambda _: emoji_sprite(e["e"]))(e)
+            self.sp[key] = {"text": text_sprite, "card": shape_sprite, "rule": rule_sprite,
+                            "logo": lambda _: dv_logos.get(e["name"])}.get(t, lambda _: emoji_sprite(e["e"]))(e)
         spr = self.sp[key]
         if t == "text":
             w, h = spr.size
@@ -197,11 +199,12 @@ class SceneRenderer:
             if vis > 0:
                 crop = spr.crop((0, 0, vis, spr.size[1]))
                 img.paste(crop, (int(e["x0"]), int(e["y"] - 13)), crop)
-        else:  # emoji / card: pop
-            s = ease_back(clamp(p)) if t == "emoji" else 0.85 + 0.15 * ease_out(clamp(p))
-            if t == "emoji":
+        else:  # emoji / logo / card: pop
+            s = ease_back(clamp(p)) if t in ("emoji", "logo") else 0.85 + 0.15 * ease_out(clamp(p))
+            if t in ("emoji", "logo"):
                 bw, bh = spr.size
-                f = e["size"] / max(bw, bh)
+                cap = 1.6 if bw / bh > 2 else 1.0          # wide word-mark logos may be wider than tall
+                f = min(e["size"] * cap / bw, e["size"] / bh)
                 size = (max(1, int(bw * f * s)), max(1, int(bh * f * s)))
             else:
                 size = (max(1, int(spr.size[0] * s)), max(1, int(spr.size[1] * s)))
