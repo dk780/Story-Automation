@@ -6,7 +6,7 @@ scenes: 10
 shots_per_scene: 9                 # a new shot every ~5 seconds
 scenes_per_call: 4
 words_per_minute: 165
-privacy: private
+privacy: public
 
 # ---- character voices (the narrator and every character get their own sound) ----
 # Edge TTS has 2 base voices per language, so extra variety comes from pitch, speed and an optional echo effect.
