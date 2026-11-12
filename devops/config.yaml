@@ -3,7 +3,7 @@ channel_name: DevOps Series        # small text in the corner of every scene
 language: english                  # narration language: english | hindi (on-screen text is always English)
 gemini_model: gemini-3.8-flash
 fallback_model: gemini-3.6-flash
-privacy: private                   # switch to public after you have reviewed a few episodes
+privacy: public                   # switch to public after you have reviewed a few episodes
 review: true                       # a second Gemini pass checks the script for technical mistakes (1 extra request)
 
 target_minutes: 5
